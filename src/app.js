@@ -7,14 +7,17 @@ const AiController = require("./controllers/AiController");
 const app = express();
 const puerto = 3000;
 
-// Middleware para leer JSON correctamente
+// Middleware base:
+// 1) parsea JSON del body
+// 2) parsea formularios
+// 3) expone la carpeta public para servir HTML/CSS/JS
 app.use(express.json({ limit: "10mb" }));     // Aumentamos el límite
 app.use(express.urlencoded({ extended: true })); // Por si envías formularios
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 const aiCtrl = new AiController();
 
-// Ruta principal
+// Endpoint para guardar texto corto/manual en la base vectorial.
 app.post("/procesar", async (req, res) => {
     try {
         const { id, texto } = req.body;
@@ -43,7 +46,7 @@ app.post("/procesar", async (req, res) => {
     }
 });
 
-// Ruta principal web
+// Página principal del frontend.
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
@@ -58,7 +61,7 @@ app.get("/estado", (req, res) => {
 });
 // Nueva ruta para hacer consultas
 
-// Nueva ruta: Listar todos los documentos
+// Endpoint de consulta rápida para saber cuántos documentos hay indexados.
 app.get("/documentos", async (req, res) => {
     try {
         const resultado = await aiCtrl.listarDocumentos();
@@ -68,7 +71,7 @@ app.get("/documentos", async (req, res) => {
     }
 });
 
-// Ruta mejorada de consulta
+// Endpoint de preguntas sobre el contenido ya almacenado en ChromaDB.
 app.post("/consultar", async (req, res) => {
     try {
         const { pregunta } = req.body;
@@ -88,6 +91,7 @@ app.post("/procesar-libro", async (req, res) => {
     try {
         const { id, titulo, rutaPDF } = req.body;
 
+        // Validamos entrada para evitar errores opacos más adelante.
         if (!id || !titulo || !rutaPDF) {
             return res.status(400).json({
                 error: "Faltan datos",
@@ -96,6 +100,7 @@ app.post("/procesar-libro", async (req, res) => {
             });
         }
 
+        // El backend debe tener acceso local al PDF; por eso comprobamos la ruta.
         if (!fs.existsSync(rutaPDF)) {
             return res.status(400).json({
                 error: "RutaPDF no encontrada",
@@ -104,6 +109,7 @@ app.post("/procesar-libro", async (req, res) => {
             });
         }
 
+        // Delegamos la lógica pesada al controlador (extraer, trocear y guardar).
         const resultado = await aiCtrl.procesarLibro(id, rutaPDF, titulo);
         res.json(resultado);
     } catch (error) {
