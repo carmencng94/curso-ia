@@ -48,7 +48,34 @@ app.get("/", (req, res) => {
         estadoChromaDB: "Conectado"
     });
 });
+// Nueva ruta para hacer consultas
 
+// Nueva ruta: Listar todos los documentos
+app.get("/documentos", async (req, res) => {
+    try {
+        const resultado = await aiCtrl.listarDocumentos();
+        res.json(resultado);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Ruta mejorada de consulta
+app.post("/consultar", async (req, res) => {
+    try {
+        const { pregunta } = req.body;
+
+        if (!pregunta) {
+            return res.status(400).json({ error: "Debes enviar una 'pregunta'" });
+        }
+
+        const resultado = await aiCtrl.consultar(pregunta);
+        res.json(resultado);
+    } catch (error) {
+        console.error("Error en /consultar:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
 app.listen(puerto, () => {
     console.log(`✅ Servidor corriendo en http://localhost:${puerto}`);
     console.log(`📡 Prueba POST en: http://localhost:${puerto}/procesar`);

@@ -4,54 +4,49 @@ const { DefaultEmbeddingFunction } = require("@chroma-core/default-embed");
 
 class VectorModel {
     constructor() {
-        // Conexión actualizada a ChromaDB v2 (recomendado)
-        this.client = new ChromaClient({
-            host: "localhost",
-            port: 8000
-        });
-        
+        this.client = new ChromaClient({ host: "localhost", port: 8000 });
         this.embeddingFunction = new DefaultEmbeddingFunction();
         this.collection = null;
     }
 
     async inicializar() {
-        console.log("🔄 Conectando a ChromaDB (v2)...");
+        if (this.collection) return this.collection;
 
         this.collection = await this.client.getOrCreateCollection({
             name: "mis_documentos",
-            embeddingFunction: this.embeddingFunction,   // ← Aquí está la solución
-            metadata: {
-                description: "Documentos anonimizados del curso"
-            }
+            embeddingFunction: this.embeddingFunction,
         });
-
-        console.log("✅ Colección 'mis_documentos' lista con embedding function");
+        console.log("✅ Conectado a ChromaDB");
         return this.collection;
     }
 
     async guardarTexto(id, texto, metadatos = {}) {
-        if (!this.collection) {
-            await this.inicializar();
-        }
-
+        await this.inicializar();
         await this.collection.add({
             ids: [id],
             documents: [texto],
             metadatas: [metadatos]
         });
-
-        console.log(`📄 Documento guardado con ID: ${id}`);
-        return "Documento guardado correctamente en ChromaDB";
+        console.log(`📄 Guardado: ${id}`);
     }
 
     async contarDocumentos() {
-        if (!this.collection) {
-            await this.inicializar();
-        }
-        
+        await this.inicializar();
         const count = await this.collection.count();
-        console.log(`📊 Total de documentos en ChromaDB: ${count}`);
+        console.log(`📊 Total documentos: ${count}`);
         return count;
+    }
+
+    // NUEVO MÉTODO: Buscar documentos similares a una pregunta
+    async buscarSimilar(pregunta, cantidad = 2) {
+        await this.inicializar();
+
+        const resultados = await this.collection.query({
+            queryTexts: [pregunta],
+            nResults: cantidad,
+        });
+
+        return resultados;
     }
 }
 
