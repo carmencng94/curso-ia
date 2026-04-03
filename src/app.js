@@ -1,5 +1,7 @@
 // src/app.js - Versión corregida
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const AiController = require("./controllers/AiController");
 
 const app = express();
@@ -8,6 +10,7 @@ const puerto = 3000;
 // Middleware para leer JSON correctamente
 app.use(express.json({ limit: "10mb" }));     // Aumentamos el límite
 app.use(express.urlencoded({ extended: true })); // Por si envías formularios
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 const aiCtrl = new AiController();
 
@@ -40,8 +43,13 @@ app.post("/procesar", async (req, res) => {
     }
 });
 
-// Ruta de estado
+// Ruta principal web
 app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+});
+
+// Ruta de estado de la API
+app.get("/estado", (req, res) => {
     res.json({
         mensaje: "🚀 Servidor MVC de IA con ChromaDB v2 funcionando correctamente",
         instrucciones: "Envía POST a /procesar con { id, texto }",
@@ -73,6 +81,33 @@ app.post("/consultar", async (req, res) => {
         res.json(resultado);
     } catch (error) {
         console.error("Error en /consultar:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+app.post("/procesar-libro", async (req, res) => {
+    try {
+        const { id, titulo, rutaPDF } = req.body;
+
+        if (!id || !titulo || !rutaPDF) {
+            return res.status(400).json({
+                error: "Faltan datos",
+                mensaje: "Se requiere 'id', 'titulo' y 'rutaPDF' en el body JSON",
+                recibido: req.body
+            });
+        }
+
+        if (!fs.existsSync(rutaPDF)) {
+            return res.status(400).json({
+                error: "RutaPDF no encontrada",
+                mensaje: "No existe un archivo PDF en la ruta indicada",
+                rutaPDF
+            });
+        }
+
+        const resultado = await aiCtrl.procesarLibro(id, rutaPDF, titulo);
+        res.json(resultado);
+    } catch (error) {
+        console.error("Error en /procesar-libro:", error);
         res.status(500).json({ error: error.message });
     }
 });
