@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resosense IA - Mi Asistente Personal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    h1 { color: #2c3e50; }
+    input, textarea, button { padding: 10px; margin: 10px 0; width: 100%; max-width: 600px; }
+    button { background: #3498db; color: white; border: none; cursor: pointer; }
+    button:hover { background: #2980b9; }
+    #respuesta { background: white; padding: 15px; border-radius: 8px; margin-top: 20px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>🤖 Resosense IA - Pregunta sobre el libro</h1>
+
+  <h3>Haz una pregunta sobre el libro:</h3>
+  <textarea id="pregunta" rows="3" placeholder="Ej: ¿De qué trata el libro Resosense?"></textarea><br>
+
+  <button onclick="hacerPregunta()">Enviar Pregunta</button>
+
+  <div id="respuesta"></div>
+
+  <script>
+    async function hacerPregunta() {
+      const pregunta = document.getElementById("pregunta").value;
+      const divRespuesta = document.getElementById("respuesta");
+
+      if (!pregunta) {
+        alert("Escribe una pregunta");
+        return;
+      }
+
+      divRespuesta.innerHTML = "Pensando...";
+
+      try {
+        const response = await fetch("http://localhost:3000/consultar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pregunta: pregunta })
+        });
+
+        const data = await response.json();
+
+        divRespuesta.innerHTML = `
+          <strong>Pregunta:</strong> ${data.pregunta}<br><br>
+          <strong>Respuesta:</strong><br>
+          ${data.respuesta || "No se encontró información"}
+          <br><br>
+          <details>
+            <summary>Ver fragmentos usados</summary>
+            <div style="margin-top:10px;">
+              ${data.contextoUsado ? data.contextoUsado.join("<br><br>---<br><br>") : "Sin fragmentos"}
+            </div>
+          </details>
+        `;
+      } catch (error) {
+        divRespuesta.innerHTML = "Error: No se pudo conectar con el servidor.";
+        console.error(error);
+      }
+    }
+  </script>
+</body>
+</html>
