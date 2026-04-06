@@ -1,23 +1,16 @@
 // src/controllers/AiController.js
 const VectorModel = require("../models/VectorModel");
+const AnonimizadorAvanzado = require("../utils/anonimizadorAvanzado");
 const { PromptTemplate } = require("@langchain/core/prompts");
 
 class AiController {
     constructor() {
         this.modelo = new VectorModel();
-    }
-
-    anonimizar(texto) {
-        const patronEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-        const patronDni   = /\b\d{8}[A-Za-z]\b/g;
-
-        return texto
-            .replace(patronEmail, "[CORREO_CONFIDENCIAL]")
-            .replace(patronDni, "[DNI_OCULTO]");
+        this.anonimizador = new AnonimizadorAvanzado();
     }
 
     async procesarYGuardar(id, contenidoBruto) {
-        const textoLimpio = this.anonimizar(contenidoBruto);
+        const textoLimpio = this.anonimizador.anonimizar(contenidoBruto);
 
         await this.modelo.guardarTexto(id, textoLimpio, {
             fecha: new Date().toISOString(),
@@ -25,35 +18,33 @@ class AiController {
         });
 
         return {
-            mensaje: "Documento procesado y guardado correctamente",
+            mensaje: "Documento procesado y guardado con privacidad",
             id: id,
             caracteresOriginales: contenidoBruto.length,
             caracteresLimpios: textoLimpio.length
         };
     }
 
-    // Nueva versión mejorada de consultar
     async consultar(pregunta) {
-        const resultados = await this.modelo.buscarSimilar(pregunta, 3);
-
+        const resultados = await this.modelo.buscarSimilar(pregunta, 4);
         const documentos = resultados.documents[0] || [];
 
-        // Prompt más profesional y claro
         const plantilla = new PromptTemplate({
             template: `
-Eres un asistente profesional y seguro.
-Responde de forma clara, concisa y profesional.
+Eres un asistente profesional, claro y preciso.
+Responde usando solo la información proporcionada.
+Si no tienes suficiente información, dilo claramente.
 
-Documentos recuperados:
+Información recuperada:
 {context}
 
-Pregunta del usuario: {pregunta}
+Pregunta: {pregunta}
 
-Respuesta:`,
+Respuesta clara y estructurada:`,
             inputVariables: ["context", "pregunta"]
         });
 
-        const contexto = documentos.join("\n\n");
+        const contexto = documentos.join("\n\n---\n\n");
 
         const promptFinal = await plantilla.format({
             context: contexto,
@@ -63,19 +54,14 @@ Respuesta:`,
         return {
             pregunta: pregunta,
             documentosRecuperados: documentos.length,
-            contextoUsado: documentos,
-            promptGenerado: promptFinal.substring(0, 300) + "...",
-            mensaje: "Consulta realizada con prompt mejorado"
+            respuesta: promptFinal,   // Aquí irá la respuesta de la IA más adelante
+            contextoUsado: documentos
         };
     }
 
-    // Nueva función: Ver todos los documentos
     async listarDocumentos() {
         const total = await this.modelo.contarDocumentos();
-        return {
-            totalDocumentos: total,
-            mensaje: `Hay ${total} documentos guardados en ChromaDB`
-        };
+        return { totalDocumentos: total };
     }
 }
 
