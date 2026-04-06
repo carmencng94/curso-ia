@@ -1,6 +1,7 @@
 // src/utils/anonimizadorAvanzado.js
 class AnonimizadorAvanzado {
     constructor() {
+        // Reglas simples para detectar datos personales frecuentes.
         this.patrones = {
             // Emails
             email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
@@ -15,14 +16,17 @@ class AnonimizadorAvanzado {
     }
 
     anonimizar(texto) {
+        // Partimos del texto original y vamos sustituyendo datos sensibles paso a paso.
         let limpio = texto;
 
+        // Reemplazamos primero los datos más fáciles de identificar.
         limpio = limpio.replace(this.patrones.email, "[CORREO_CONFIDENCIAL]");
         limpio = limpio.replace(this.patrones.dni, "[DNI_OCULTO]");
         limpio = limpio.replace(this.patrones.nie, "[NIE_OCULTO]");
         limpio = limpio.replace(this.patrones.telefono, "[TELEFONO_OCULTO]");
 
-        // Anonimizar nombres solo si son largos (evita falsos positivos)
+        // Anonimizar nombres solo si son largos (evita falsos positivos).
+        // Esto no es perfecto, pero ayuda a ocultar nombres completos frecuentes.
         limpio = limpio.replace(this.patrones.nombre, (match) => {
             return match.length > 8 ? "[NOMBRE_OCULTO]" : match;
         });

@@ -3,18 +3,22 @@ const fs = require("fs");
 const { PDFParse } = require("pdf-parse");
 
 async function extraerTextoDePDF(rutaPDF) {
+    // Abrimos el archivo como buffer binario para pasarlo al parser.
     const dataBuffer = fs.readFileSync(rutaPDF);
     const parser = new PDFParse({ data: dataBuffer });
 
     try {
+        // getText devuelve el contenido textual de todas las páginas.
         const data = await parser.getText();
         return data.text;
     } finally {
+        // Liberamos recursos internos del parser al terminar.
         await parser.destroy();
     }
 }
 
 function dividirEnChunks(texto, tamanoChunk = 600) {
+    // Dividimos por palabras para crear bloques de tamaño razonable.
     const chunks = [];
     const palabras = texto.split(" ");
 

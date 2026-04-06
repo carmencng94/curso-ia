@@ -5,6 +5,7 @@ const AnonimizadorAvanzado = require("../utils/anonimizadorAvanzado");
 class AiController {
     
     constructor() {
+        // El controlador coordina el flujo: recibe datos, llama al modelo y devuelve respuesta.
         this.modelo = new VectorModel();
         this.anonimizador = new AnonimizadorAvanzado();   // Creamos el anonimizador
     }
@@ -12,12 +13,14 @@ class AiController {
     // Este método se usa cuando el usuario envía texto manual y queremos guardarlo.
     async procesarYGuardar(id, contenidoBruto) {
         
-        // 1. Limpiamos el texto con el anonimizador avanzado
+        // 1. Limpiamos el texto con el anonimizador avanzado.
+        // Así evitamos guardar correos, DNI u otros datos sensibles.
         const textoLimpio = this.anonimizador.anonimizar(contenidoBruto);
 
         console.log("✅ Texto anonimizado correctamente");
 
-        // 2. Guardamos el texto limpio en ChromaDB
+        // 2. Guardamos el texto limpio en ChromaDB.
+        // Aquí ya se crea el documento vectorial.
         await this.modelo.guardarTexto(id, textoLimpio, {
             fecha: new Date().toISOString(),
             origen: "api"
@@ -36,6 +39,7 @@ class AiController {
         const { extraerTextoDePDF, dividirEnChunks } = require("../utils/procesarPDF");
 
         // Si el primer chunk ya existe, asumimos que este libro ya fue indexado.
+        // Esto evita duplicar el mismo libro si alguien pulsa dos veces el botón.
         const yaProcesado = await this.modelo.existeDocumento(`${idLibro}_chunk_0`);
         if (yaProcesado) {
             return {
@@ -48,16 +52,20 @@ class AiController {
         }
 
         // 1) Leemos el PDF completo y sacamos todo su texto.
+        // PDFParse devuelve texto plano de todas las páginas.
         const textoCompleto = await extraerTextoDePDF(rutaPDF);
         // 2) Lo partimos en trozos para que ChromaDB lo pueda indexar mejor.
+        // Así luego podemos recuperar solo la parte relevante cuando preguntamos.
         const chunks = dividirEnChunks(textoCompleto);
 
         for (let i = 0; i < chunks.length; i++) {
             const idChunk = `${idLibro}_chunk_${i}`;
             // Antes de guardar, volvemos a anonimizar por seguridad.
+            // Cada trozo puede contener nombres, emails o teléfonos.
             const chunkAnonimizado = this.anonimizador.anonimizar(chunks[i]);
 
             // Cada chunk se guarda como un documento independiente.
+            // Esto mejora la búsqueda semántica y evita guardar el PDF entero en un solo bloque.
             await this.modelo.guardarTexto(idChunk, chunkAnonimizado, {
                 titulo: tituloLibro,
                 tipo: "libro",
@@ -87,6 +95,7 @@ class AiController {
     }
 
     // Borra todos los chunks de un libro usando su id base.
+    // Sirve para limpiar un libro completo antes de volver a cargarlo.
     async eliminarLibro(idLibro) {
         const resultado = await this.modelo.eliminarLibro(idLibro);
 
@@ -106,6 +115,7 @@ class AiController {
     }
 
     // Importante: este método SOLO consulta. No guarda ni duplica documentos.
+    // Toma la pregunta, busca fragmentos parecidos y se los pasa a Ollama para redactar respuesta.
     async consultar(pregunta) {
 
         console.log(`🔎 Buscando: "${pregunta}"`);
@@ -115,7 +125,7 @@ class AiController {
         const resultados = await this.modelo.buscarSimilar(pregunta, 4);
         const documentos = resultados.documents[0] || [];
 
-        // Si no encuentra nada
+        // Si no encuentra nada, respondemos sin intentar llamar al modelo.
         if (documentos.length === 0) {
             return {
                 pregunta: pregunta,
@@ -123,10 +133,10 @@ class AiController {
             };
         }
 
-        // 2. Unimos los documentos encontrados
+        // Unimos los documentos encontrados en un solo contexto legible.
         const contexto = documentos.join("\n\n---\n\n");
 
-        // 3. Llamamos a Ollama para generar una respuesta bonita
+        // Llamamos a Ollama para generar una respuesta más natural.
         const ollamaService = new (require("../services/OllamaService"))();
         const respuestaIA = await ollamaService.generarRespuesta(pregunta, contexto);
 

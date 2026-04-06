@@ -3,13 +3,16 @@ const { Ollama } = require("ollama");
 
 class OllamaService {
     constructor() {
-        this.modelo = "gemma2:2b";   // Modelo ligero y bueno
+        // Modelo local que descargaste dentro del contenedor Ollama.
+        this.modelo = "gemma2:2b";
+        // Cliente apuntando al puerto expuesto por el contenedor.
         this.client = new Ollama({ host: "http://127.0.0.1:11434" });
     }
 
-    // Funcion principal para hacer preguntas usando tus documentos
+    // Genera una respuesta en lenguaje natural usando la pregunta y el contexto recuperado.
     async generarRespuesta(pregunta, contextoDocumentos) {
         try {
+            // El prompt le dice al modelo qué rol tiene y qué información puede usar.
             const prompt = `
 Eres un asistente util, claro y profesional.
 
@@ -24,6 +27,7 @@ Pregunta del usuario: ${pregunta}
 Respuesta clara y bien estructurada:
 `;
 
+            // generate devuelve un objeto con la respuesta textual del modelo.
             const respuesta = await this.client.generate({
                 model: this.modelo,
                 prompt: prompt,

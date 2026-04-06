@@ -14,8 +14,9 @@
   </style>
 </head>
 <body>
-  <h1>🤖 Resosense IA - Pregunta sobre el libro</h1>
+  <h1>Resosense IA - Pregunta sobre el libro</h1>
 
+  <!-- Formulario para cargar un PDF local y guardarlo en ChromaDB -->
   <h3>Procesar un PDF:</h3>
   <input id="booksApiKey" type="password" placeholder="Clave opcional para libros (BOOKS_API_KEY)" />
   <input id="idLibro" type="text" placeholder="ID base (ej: libro_001)" />
@@ -24,11 +25,13 @@
   <button onclick="procesarLibro()">Procesar libro</button>
   <div id="estadoProcesado" style="background:white; padding:15px; border-radius:8px; margin-top:10px;"></div>
 
+  <!-- Este bloque sirve para limpiar un libro completo si quieres volver a cargarlo desde cero -->
   <h3>Eliminar un libro duplicado:</h3>
   <input id="idEliminar" type="text" placeholder="ID base a eliminar (ej: libro_001)" />
   <button onclick="eliminarLibro()" style="background:#d9534f;">Eliminar libro</button>
   <div id="estadoEliminado" style="background:white; padding:15px; border-radius:8px; margin-top:10px;"></div>
 
+  <!-- Área para hacer preguntas sobre el contenido ya indexado -->
   <h3>Haz una pregunta sobre el libro:</h3>
   <textarea id="pregunta" rows="3" placeholder="Ej: ¿De qué trata el libro Resosense?"></textarea><br>
 
@@ -37,6 +40,7 @@
   <div id="respuesta"></div>
 
   <script>
+    // Borra todos los chunks asociados a un id base de libro.
     async function eliminarLibro() {
       const apiKey = document.getElementById("booksApiKey").value;
       const id = document.getElementById("idEliminar").value;
@@ -50,6 +54,7 @@
       divEstado.innerHTML = "Eliminando libro...";
 
       try {
+        // Si el usuario puso clave, la enviamos para proteger la operación.
         const headers = { "Content-Type": "application/json" };
 
         if (apiKey) {
@@ -80,6 +85,7 @@
       }
     }
 
+    // Envía el PDF al backend para extraerlo, dividirlo en chunks y guardarlo.
     async function procesarLibro() {
       const apiKey = document.getElementById("booksApiKey").value;
       const id = document.getElementById("idLibro").value;
@@ -95,6 +101,7 @@
       divEstado.innerHTML = "Procesando PDF...";
 
       try {
+        // Si existe una clave, la enviamos al servidor.
         const headers = { "Content-Type": "application/json" };
 
         if (apiKey) {
@@ -126,6 +133,7 @@
       }
     }
 
+    // Hace una consulta al backend y muestra la respuesta generada por Ollama.
     async function hacerPregunta() {
       const pregunta = document.getElementById("pregunta").value;
       const divRespuesta = document.getElementById("respuesta");
