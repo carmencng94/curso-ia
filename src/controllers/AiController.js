@@ -4,70 +4,61 @@ const AnonimizadorAvanzado = require("../utils/anonimizadorAvanzado");
 const { PromptTemplate } = require("@langchain/core/prompts");
 
 class AiController {
+    
     constructor() {
         this.modelo = new VectorModel();
-        this.anonimizador = new AnonimizadorAvanzado();
+        this.anonimizador = new AnonimizadorAvanzado();   // Creamos el anonimizador
     }
 
+    // Esta función limpia los datos sensibles
     async procesarYGuardar(id, contenidoBruto) {
+        
+        // 1. Limpiamos el texto con el anonimizador avanzado
         const textoLimpio = this.anonimizador.anonimizar(contenidoBruto);
 
+        console.log("✅ Texto anonimizado correctamente");
+
+        // 2. Guardamos el texto limpio en ChromaDB
         await this.modelo.guardarTexto(id, textoLimpio, {
             fecha: new Date().toISOString(),
             origen: "api"
         });
 
         return {
-            mensaje: "Documento procesado y guardado con privacidad",
+            mensaje: "Documento guardado con privacidad",
             id: id,
-            caracteresOriginales: contenidoBruto.length,
-            caracteresLimpios: textoLimpio.length
+            original: contenidoBruto.length + " caracteres",
+            limpio: textoLimpio.length + " caracteres"
         };
     }
 
-    // Nueva versión mejorada de consultar
+    // Función mejorada para hacer preguntas
     async consultar(pregunta) {
-        const resultados = await this.modelo.buscarSimilar(pregunta, 3);
 
+        console.log(`🔎 Buscando información sobre: "${pregunta}"`);
+
+        // Buscamos los documentos más parecidos en ChromaDB
+        const resultados = await this.modelo.buscarSimilar(pregunta, 4);
         const documentos = resultados.documents[0] || [];
 
-        // Prompt más profesional y claro
-        const plantilla = new PromptTemplate({
-            template: `
-Eres un asistente profesional y seguro.
-Responde de forma clara, concisa y profesional.
+        // Si no encuentra nada
+        if (documentos.length === 0) {
+            return {
+                pregunta: pregunta,
+                respuesta: "Lo siento, no encontré información relacionada con tu pregunta.",
+                documentosEncontrados: 0
+            };
+        }
 
-Información recuperada:
-{context}
-
-Pregunta: {pregunta}
-
-Respuesta:`,
-            inputVariables: ["context", "pregunta"]
-        });
-
-        const contexto = documentos.join("\n\n");
-
-        const promptFinal = await plantilla.format({
-            context: contextoFinal.join("\n\n---\n\n"),
-            pregunta
-        });
+        // Unimos los documentos encontrados para que sea más fácil de leer
+        const contexto = documentos.join("\n\n---\n\n");
 
         return {
-            pregunta,
-            documentosRecuperados: documentos.length,
-            contextoUsado: documentos,
-            promptGenerado: promptFinal.substring(0, 300) + "...",
-            mensaje: "Consulta realizada con prompt mejorado"
-        };
-    }
-
-    // Nueva función: Ver todos los documentos
-    async listarDocumentos() {
-        const total = await this.modelo.contarDocumentos();
-        return {
-            totalDocumentos: total,
-            mensaje: `Hay ${total} documentos guardados en ChromaDB`
+            pregunta: pregunta,
+            respuesta: "Aquí tienes la información encontrada:",
+            documentosEncontrados: documentos.length,
+            informacionRecuperada: documentos,   // Los trozos originales
+            contextoCompleto: contexto           // Todo junto
         };
     }
 }
