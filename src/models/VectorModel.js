@@ -44,15 +44,22 @@ class VectorModel {
     }
 
     // NUEVO MÉTODO: Buscar documentos similares a una pregunta
-    async buscarSimilar(pregunta, cantidad = 2) {
+    async buscarSimilar(pregunta, cantidad = 2, filtros = {}) {
         // Esta consulta solo lee datos ya guardados; no crea documentos nuevos.
         // ChromaDB usa el embedding de la pregunta para encontrar el contenido más parecido.
         await this.inicializar();
 
-        const resultados = await this.collection.query({
+        const query = {
             queryTexts: [pregunta],
             nResults: cantidad,
-        });
+        };
+
+        // Permite acotar la búsqueda por título para no mezclar libros distintos.
+        if (filtros.titulo) {
+            query.where = { titulo: filtros.titulo };
+        }
+
+        const resultados = await this.collection.query(query);
 
         return resultados;
     }

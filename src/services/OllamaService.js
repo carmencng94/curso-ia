@@ -1,12 +1,60 @@
 // src/services/OllamaService.js
-const { Ollama } = require("ollama");
 
 class OllamaService {
     constructor() {
-        // Modelo local que descargaste dentro del contenedor Ollama.
-        this.modelo = "gemma2:2b";
-        // Cliente apuntando al puerto expuesto por el contenedor.
-        this.client = new Ollama({ host: "http://127.0.0.1:11434" });
+        this.host = "http://127.0.0.1:11434";
+        // Orden de preferencia de modelos. Puedes cambiarlo con OLLAMA_MODELS en .env.
+        this.modelos = (process.env.OLLAMA_MODELS || "llama3.2:3b,gemma2:2b")
+            .split(",")
+            .map((m) => m.trim())
+            .filter(Boolean);
+    }
+
+    async intentarGenerate(modelo, prompt) {
+        const response = await fetch(`${this.host}/api/generate`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: modelo,
+                prompt,
+                stream: false
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+
+        const respuesta = await response.json();
+        return respuesta.response || "";
+    }
+
+    async intentarChat(modelo, prompt) {
+        const response = await fetch(`${this.host}/api/chat`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: modelo,
+                messages: [
+                    {
+                        role: "user",
+                        content: prompt
+                    }
+                ],
+                stream: false
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+
+        const respuesta = await response.json();
+        return respuesta.message?.content || "";
     }
 
     // Genera una respuesta en lenguaje natural usando la pregunta y el contexto recuperado.
@@ -26,15 +74,26 @@ Pregunta del usuario: ${pregunta}
 
 Respuesta clara y bien estructurada:
 `;
+            const errores = [];
 
-            // generate devuelve un objeto con la respuesta textual del modelo.
-            const respuesta = await this.client.generate({
-                model: this.modelo,
-                prompt: prompt,
-                stream: false
-            });
+            // Intentamos cada modelo en orden. Para cada modelo probamos chat y generate.
+            for (const modelo of this.modelos) {
+                try {
+                    const porChat = await this.intentarChat(modelo, prompt);
+                    if (porChat) return porChat;
+                } catch (errorChat) {
+                    errores.push(`[${modelo}][chat] ${errorChat.message}`);
+                }
 
-            return respuesta.response;
+                try {
+                    const porGenerate = await this.intentarGenerate(modelo, prompt);
+                    if (porGenerate) return porGenerate;
+                } catch (errorGenerate) {
+                    errores.push(`[${modelo}][generate] ${errorGenerate.message}`);
+                }
+            }
+
+            throw new Error(errores.join(" | "));
 
         } catch (error) {
             console.error("Error con Ollama:", error.message);

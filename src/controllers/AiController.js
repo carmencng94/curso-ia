@@ -35,8 +35,8 @@ class AiController {
     }
 
     // Este método guarda un PDF en partes pequeñas para poder buscarlo después.
-    async procesarLibro(idLibro, rutaPDF, tituloLibro) {
-        const { extraerTextoDePDF, dividirEnChunks } = require("../utils/procesarPDF");
+    async procesarLibro(idLibro, rutaArchivo, tituloLibro) {
+        const { extraerTextoDeDocumento, dividirEnChunks } = require("../utils/procesarPDF");
 
         // Si el primer chunk ya existe, asumimos que este libro ya fue indexado.
         // Esto evita duplicar el mismo libro si alguien pulsa dos veces el botón.
@@ -51,9 +51,9 @@ class AiController {
             };
         }
 
-        // 1) Leemos el PDF completo y sacamos todo su texto.
-        // PDFParse devuelve texto plano de todas las páginas.
-        const textoCompleto = await extraerTextoDePDF(rutaPDF);
+        // 1) Leemos el archivo completo y sacamos todo su texto.
+        // Soporta PDF y DOCX.
+        const textoCompleto = await extraerTextoDeDocumento(rutaArchivo);
         // 2) Lo partimos en trozos para que ChromaDB lo pueda indexar mejor.
         // Así luego podemos recuperar solo la parte relevante cuando preguntamos.
         const chunks = dividirEnChunks(textoCompleto);
@@ -116,17 +116,42 @@ class AiController {
 
     // Importante: este método SOLO consulta. No guarda ni duplica documentos.
     // Toma la pregunta, busca fragmentos parecidos y se los pasa a Ollama para redactar respuesta.
-    async consultar(pregunta) {
+    async consultar(pregunta, opciones = {}) {
 
         console.log(`🔎 Buscando: "${pregunta}"`);
 
         // Buscamos los documentos más parecidos en ChromaDB.
         // Aquí solo leemos información; no se escribe nada en la base.
-        const resultados = await this.modelo.buscarSimilar(pregunta, 4);
+        const resultados = await this.modelo.buscarSimilar(pregunta, 6, {
+            titulo: opciones.titulo || undefined
+        });
         const documentos = resultados.documents[0] || [];
+        const metadatas = resultados.metadatas?.[0] || [];
+
+        // Quitamos documentos repetidos para no sesgar la respuesta del modelo.
+        const vistos = new Set();
+        const documentosUnicos = [];
+        const titulosUnicos = new Set();
+
+        for (let i = 0; i < documentos.length; i++) {
+            const doc = documentos[i];
+            const key = (doc || "").trim();
+
+            if (!key || vistos.has(key)) {
+                continue;
+            }
+
+            vistos.add(key);
+            documentosUnicos.push(doc);
+
+            const tituloMeta = metadatas[i]?.titulo;
+            if (tituloMeta) {
+                titulosUnicos.add(tituloMeta);
+            }
+        }
 
         // Si no encuentra nada, respondemos sin intentar llamar al modelo.
-        if (documentos.length === 0) {
+        if (documentosUnicos.length === 0) {
             return {
                 pregunta: pregunta,
                 respuesta: "No encontré información relacionada con tu pregunta."
@@ -134,7 +159,7 @@ class AiController {
         }
 
         // Unimos los documentos encontrados en un solo contexto legible.
-        const contexto = documentos.join("\n\n---\n\n");
+        const contexto = documentosUnicos.join("\n\n---\n\n");
 
         // Llamamos a Ollama para generar una respuesta más natural.
         const ollamaService = new (require("../services/OllamaService"))();
@@ -143,7 +168,8 @@ class AiController {
         return {
             pregunta: pregunta,
             respuesta: respuestaIA,
-            documentosUsados: documentos.length
+            documentosUsados: documentosUnicos.length,
+            fuenteTitulos: Array.from(titulosUnicos)
         };
     }
 }

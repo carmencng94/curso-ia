@@ -16,12 +16,12 @@
 <body>
   <h1>Resosense IA - Pregunta sobre el libro</h1>
 
-  <!-- Formulario para cargar un PDF local y guardarlo en ChromaDB -->
-  <h3>Procesar un PDF:</h3>
+  <!-- Formulario para cargar un PDF o DOCX local y guardarlo en ChromaDB -->
+  <h3>Procesar un documento (PDF o DOCX):</h3>
   <input id="booksApiKey" type="password" placeholder="Clave opcional para libros (BOOKS_API_KEY)" />
   <input id="idLibro" type="text" placeholder="ID base (ej: libro_001)" />
   <input id="tituloLibro" type="text" placeholder="Título del libro" />
-  <input id="rutaPDF" type="text" placeholder="Ruta local del PDF (ej: C:\\ruta\\archivo.pdf)" />
+  <input id="rutaArchivo" type="text" placeholder="Ruta local del archivo (ej: C:\\ruta\\archivo.pdf o .docx)" />
   <button onclick="procesarLibro()">Procesar libro</button>
   <div id="estadoProcesado" style="background:white; padding:15px; border-radius:8px; margin-top:10px;"></div>
 
@@ -33,6 +33,7 @@
 
   <!-- Área para hacer preguntas sobre el contenido ya indexado -->
   <h3>Haz una pregunta sobre el libro:</h3>
+  <input id="tituloConsulta" type="text" placeholder="Título a consultar (opcional, recomendado si tienes varios libros)" />
   <textarea id="pregunta" rows="3" placeholder="Ej: ¿De qué trata el libro Resosense?"></textarea><br>
 
   <button onclick="hacerPregunta()">Enviar Pregunta</button>
@@ -85,20 +86,20 @@
       }
     }
 
-    // Envía el PDF al backend para extraerlo, dividirlo en chunks y guardarlo.
+    // Envía el archivo (PDF o DOCX) al backend para extraerlo, dividirlo en chunks y guardarlo.
     async function procesarLibro() {
       const apiKey = document.getElementById("booksApiKey").value;
       const id = document.getElementById("idLibro").value;
       const titulo = document.getElementById("tituloLibro").value;
-      const rutaPDF = document.getElementById("rutaPDF").value;
+      const rutaArchivo = document.getElementById("rutaArchivo").value;
       const divEstado = document.getElementById("estadoProcesado");
 
-      if (!id || !titulo || !rutaPDF) {
-        alert("Completa id, título y rutaPDF");
+      if (!id || !titulo || !rutaArchivo) {
+        alert("Completa id, título y rutaArchivo");
         return;
       }
 
-      divEstado.innerHTML = "Procesando PDF...";
+      divEstado.innerHTML = "Procesando...";
 
       try {
         // Si existe una clave, la enviamos al servidor.
@@ -111,7 +112,7 @@
         const response = await fetch("/procesar-libro", {
           method: "POST",
           headers,
-          body: JSON.stringify({ id, titulo, rutaPDF })
+          body: JSON.stringify({ id, titulo, rutaArchivo })
         });
 
         const data = await response.json();
@@ -136,6 +137,7 @@
     // Hace una consulta al backend y muestra la respuesta generada por Ollama.
     async function hacerPregunta() {
       const pregunta = document.getElementById("pregunta").value;
+      const tituloConsulta = document.getElementById("tituloConsulta").value;
       const divRespuesta = document.getElementById("respuesta");
 
       if (!pregunta) {
@@ -149,7 +151,7 @@
         const response = await fetch("/consultar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta: pregunta })
+          body: JSON.stringify({ pregunta: pregunta, titulo: tituloConsulta || undefined })
         });
 
         const data = await response.json();
@@ -160,6 +162,8 @@
           ${data.respuesta || "No se encontró información"}
           <br><br>
           <strong>Documentos usados:</strong> ${data.documentosUsados ?? "N/D"}
+          <br>
+          <strong>Títulos fuente:</strong> ${(data.fuenteTitulos || []).join(", ") || "N/D"}
         `;
       } catch (error) {
         divRespuesta.innerHTML = "Error: No se pudo conectar con el servidor.";

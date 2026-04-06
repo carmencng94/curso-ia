@@ -1,4 +1,5 @@
 // src/app.js - Versión corregida
+require("dotenv").config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -100,13 +101,13 @@ app.get("/documentos", async (req, res) => {
 // Aquí solo se consulta, no se vuelve a guardar nada.
 app.post("/consultar", async (req, res) => {
     try {
-        const { pregunta } = req.body;
+        const { pregunta, titulo } = req.body;
 
         if (!pregunta) {
             return res.status(400).json({ error: "Debes enviar una 'pregunta'" });
         }
 
-        const resultado = await aiCtrl.consultar(pregunta);
+        const resultado = await aiCtrl.consultar(pregunta, { titulo });
         res.json(resultado);
     } catch (error) {
         console.error("Error en /consultar:", error);
@@ -117,28 +118,40 @@ app.post("/consultar", async (req, res) => {
 // Si BOOKS_API_KEY está definida, exige la cabecera x-api-key.
 app.post("/procesar-libro", validarClaveLibros, async (req, res) => {
     try {
-        const { id, titulo, rutaPDF } = req.body;
+        const { id, titulo, rutaArchivo, rutaPDF } = req.body;
+        const rutaDocumento = rutaArchivo || rutaPDF;
+        const idNormalizado = String(id || "").trim().toLowerCase();
 
         // Validamos que el usuario haya enviado todos los datos obligatorios.
-        if (!id || !titulo || !rutaPDF) {
+        if (!idNormalizado || !titulo || !rutaDocumento) {
             return res.status(400).json({
                 error: "Faltan datos",
-                mensaje: "Se requiere 'id', 'titulo' y 'rutaPDF' en el body JSON",
+                mensaje: "Se requiere 'id', 'titulo' y 'rutaArchivo' (o 'rutaPDF') en el body JSON",
                 recibido: req.body
             });
         }
 
-        // El backend debe poder leer el PDF en disco; si la ruta no existe, paramos aquí.
-        if (!fs.existsSync(rutaPDF)) {
+        const extension = path.extname(rutaDocumento).toLowerCase();
+
+        if (![".pdf", ".docx"].includes(extension)) {
             return res.status(400).json({
-                error: "RutaPDF no encontrada",
-                mensaje: "No existe un archivo PDF en la ruta indicada",
-                rutaPDF
+                error: "Formato no soportado",
+                mensaje: "Solo se permiten archivos .pdf o .docx",
+                extension
+            });
+        }
+
+        // El backend debe poder leer el archivo en disco; si la ruta no existe, paramos aquí.
+        if (!fs.existsSync(rutaDocumento)) {
+            return res.status(400).json({
+                error: "RutaArchivo no encontrada",
+                mensaje: "No existe un archivo en la ruta indicada",
+                rutaArchivo: rutaDocumento
             });
         }
 
         // El controlador se encarga de extraer el texto, dividirlo y guardarlo.
-        const resultado = await aiCtrl.procesarLibro(id, rutaPDF, titulo);
+        const resultado = await aiCtrl.procesarLibro(idNormalizado, rutaDocumento, titulo);
         res.json(resultado);
     } catch (error) {
         console.error("Error en /procesar-libro:", error);
@@ -151,15 +164,16 @@ app.post("/procesar-libro", validarClaveLibros, async (req, res) => {
 app.post("/eliminar-libro", validarClaveLibros, async (req, res) => {
     try {
         const { id } = req.body;
+        const idNormalizado = String(id || "").trim().toLowerCase();
 
-        if (!id) {
+        if (!idNormalizado) {
             return res.status(400).json({
                 error: "Faltan datos",
                 mensaje: "Se requiere 'id' en el body JSON"
             });
         }
 
-        const resultado = await aiCtrl.eliminarLibro(id);
+        const resultado = await aiCtrl.eliminarLibro(idNormalizado);
         res.json(resultado);
     } catch (error) {
         console.error("Error en /eliminar-libro:", error);

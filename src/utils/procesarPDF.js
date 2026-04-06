@@ -1,6 +1,8 @@
 // src/utils/procesarPDF.js
 const fs = require("fs");
+const path = require("path");
 const { PDFParse } = require("pdf-parse");
+const mammoth = require("mammoth");
 
 async function extraerTextoDePDF(rutaPDF) {
     // Abrimos el archivo como buffer binario para pasarlo al parser.
@@ -15,6 +17,21 @@ async function extraerTextoDePDF(rutaPDF) {
         // Liberamos recursos internos del parser al terminar.
         await parser.destroy();
     }
+}
+
+async function extraerTextoDeDocumento(rutaArchivo) {
+    const extension = path.extname(rutaArchivo).toLowerCase();
+
+    if (extension === ".pdf") {
+        return extraerTextoDePDF(rutaArchivo);
+    }
+
+    if (extension === ".docx") {
+        const resultado = await mammoth.extractRawText({ path: rutaArchivo });
+        return resultado.value || "";
+    }
+
+    throw new Error("Formato no soportado. Usa .pdf o .docx");
 }
 
 function dividirEnChunks(texto, tamanoChunk = 600) {
@@ -38,4 +55,4 @@ function dividirEnChunks(texto, tamanoChunk = 600) {
     return chunks;
 }
 
-module.exports = { extraerTextoDePDF, dividirEnChunks };
+module.exports = { extraerTextoDePDF, extraerTextoDeDocumento, dividirEnChunks };
