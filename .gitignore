@@ -22,6 +22,12 @@ pids/
 # ChromaDB persistent local data
 /db_data/
 
+# Ollama local data
+/ollama_data/
+
+# PDF procesado localmente
+/resosense.pdf
+
 # OS/editor artifacts
 .DS_Store
 Thumbs.db

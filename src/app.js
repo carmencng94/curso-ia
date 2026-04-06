@@ -6,6 +6,7 @@ const AiController = require("./controllers/AiController");
 
 const app = express();
 const puerto = 3000;
+const booksApiKey = process.env.BOOKS_API_KEY || "";
 
 // Middleware base:
 // 1) parsea JSON del body
@@ -14,6 +15,25 @@ const puerto = 3000;
 app.use(express.json({ limit: "10mb" }));     // Aumentamos el límite
 app.use(express.urlencoded({ extended: true })); // Por si envías formularios
 app.use(express.static(path.join(__dirname, "..", "public")));
+
+// Si defines BOOKS_API_KEY, estas rutas pedirán x-api-key.
+// Si no defines la variable, el proyecto sigue funcionando como antes en local.
+function validarClaveLibros(req, res, next) {
+    if (!booksApiKey) {
+        return next();
+    }
+
+    const apiKey = req.get("x-api-key");
+
+    if (apiKey !== booksApiKey) {
+        return res.status(401).json({
+            error: "No autorizado",
+            mensaje: "Falta o es incorrecta la clave para cargar o borrar libros"
+        });
+    }
+
+    next();
+}
 
 const aiCtrl = new AiController();
 
@@ -87,7 +107,7 @@ app.post("/consultar", async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-app.post("/procesar-libro", async (req, res) => {
+app.post("/procesar-libro", validarClaveLibros, async (req, res) => {
     try {
         const { id, titulo, rutaPDF } = req.body;
 
@@ -114,6 +134,26 @@ app.post("/procesar-libro", async (req, res) => {
         res.json(resultado);
     } catch (error) {
         console.error("Error en /procesar-libro:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Endpoint para borrar todos los chunks de un libro por su id base.
+app.post("/eliminar-libro", validarClaveLibros, async (req, res) => {
+    try {
+        const { id } = req.body;
+
+        if (!id) {
+            return res.status(400).json({
+                error: "Faltan datos",
+                mensaje: "Se requiere 'id' en el body JSON"
+            });
+        }
+
+        const resultado = await aiCtrl.eliminarLibro(id);
+        res.json(resultado);
+    } catch (error) {
+        console.error("Error en /eliminar-libro:", error);
         res.status(500).json({ error: error.message });
     }
 });
